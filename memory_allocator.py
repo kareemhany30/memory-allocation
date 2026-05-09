@@ -44,7 +44,7 @@ class AllocationError(ValueError):
 class MemoryManager:
     def __init__(self, total_size: int = 1024) -> None:
         self.total_size = total_size
-        self.holes: list[Hole] = [Hole(0, total_size)]
+        self.holes: list[Hole] = []
         self.allocations: dict[str, list[SegmentPlacement]] = {}
 
     def configure_memory(self, total_size: int, holes: list[Hole]) -> None:
@@ -175,7 +175,7 @@ class MemoryManager:
 
     def _validate_holes(self, total_size: int, holes: list[Hole]) -> list[Hole]:
         if not holes:
-            raise ValueError("Add at least one hole.")
+            return []
 
         ordered = sorted(holes, key=lambda item: item.start)
         previous_end = 0

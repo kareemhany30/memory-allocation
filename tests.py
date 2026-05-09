@@ -4,6 +4,12 @@ from memory_allocator import AllocationError, Hole, MemoryManager
 
 
 class MemoryManagerTests(unittest.TestCase):
+    def test_default_memory_starts_with_no_holes(self):
+        manager = MemoryManager()
+
+        self.assertEqual(manager.holes, [])
+        self.assertEqual([(b.start, b.size, b.kind) for b in manager.snapshot()], [(0, 1024, "reserved")])
+
     def test_first_fit_allocates_segments_and_updates_holes(self):
         manager = MemoryManager()
         manager.configure_memory(500, [Hole(0, 100), Hole(200, 200)])

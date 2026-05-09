@@ -99,9 +99,10 @@ class MemoryAllocationApp:
         self.small = pygame.font.SysFont("Segoe UI", 13)
         self.bold = pygame.font.SysFont("Segoe UI Semibold", 18)
         self.title = pygame.font.SysFont("Segoe UI Semibold", 24)
+        self.block_font = pygame.font.SysFont("Segoe UI Semibold", 14)
 
         self.manager = MemoryManager(1024)
-        self.pending_holes: list[Hole] = [Hole(0, 1024)]
+        self.pending_holes: list[Hole] = []
         self.pending_segments: list[tuple[str, int]] = []
         self.method = "first_fit"
         self.status = "Enter holes, add process segments, then allocate."
@@ -144,6 +145,8 @@ class MemoryAllocationApp:
         try:
             if action == "add_hole":
                 self.add_hole()
+            elif action == "reset_all":
+                self.reset_all()
             elif action == "reset_memory":
                 self.reset_memory()
             elif action == "clear_holes":
@@ -177,6 +180,21 @@ class MemoryAllocationApp:
         total = self.parse_int("total", "Total memory size", minimum=1)
         self.manager.configure_memory(total, self.pending_holes)
         self.status_ok("Memory configured. Existing allocations were cleared.")
+
+    def reset_all(self) -> None:
+        self.manager = MemoryManager(1024)
+        self.pending_holes = []
+        self.pending_segments.clear()
+        self.method = "first_fit"
+        self.inputs["total"].value = "1024"
+        self.inputs["hole_start"].value = ""
+        self.inputs["hole_size"].value = ""
+        self.inputs["process"].value = "P1"
+        self.inputs["segment"].value = ""
+        self.inputs["segment_size"].value = ""
+        for field in self.inputs.values():
+            field.active = False
+        self.status_ok("Simulator reset to the default memory state.")
 
     def add_segment(self) -> None:
         name = self.inputs["segment"].value.strip()
@@ -221,6 +239,7 @@ class MemoryAllocationApp:
 
     def buttons(self) -> list[Button]:
         buttons = [
+            Button(pygame.Rect(154, 122, 166, 38), "Reset All", "reset_all", RED),
             Button(pygame.Rect(208, 202, 112, 38), "Add Hole", "add_hole", GREEN),
             Button(pygame.Rect(24, 252, 142, 36), "Apply Memory", "reset_memory", BLUE),
             Button(pygame.Rect(178, 252, 142, 36), "Clear Holes", "clear_holes", RED),
@@ -312,7 +331,8 @@ class MemoryAllocationApp:
         cursor_y = y
         for index, block in enumerate(blocks):
             raw_height = block.size / total * h
-            block_height = max(16, int(raw_height)) if block.size > 0 else 0
+            min_height = 20 if block.kind == "segment" else 16
+            block_height = max(min_height, int(raw_height)) if block.size > 0 else 0
             if index == len(blocks) - 1:
                 block_height = y + h - cursor_y
 
@@ -323,10 +343,46 @@ class MemoryAllocationApp:
 
             label = f"{block.start}-{block.end}  {block.label} ({block.size})"
             text_color = (255, 255, 255) if block.kind == "segment" else INK
-            self.screen.blit(self.small.render(label, True, text_color), (rect.x + 8, rect.y + 3))
+            self.draw_block_label(rect, block, label, text_color)
             cursor_y += block_height
 
         self.status_box(pygame.Rect(364, 700, 350, 24))
+
+    def draw_block_label(self, rect: pygame.Rect, block, label: str, color: tuple[int, int, int]) -> None:
+        left = rect.x + 8
+        max_width = rect.width - 16
+
+        if block.kind == "segment":
+            process, _, segment = block.label.partition(":")
+            if rect.height < 28:
+                process_text = self.fit_text(process, self.small, max_width)
+                text_y = rect.y + max(1, (rect.height - self.small.get_height()) // 2)
+                self.screen.blit(self.small.render(process_text, True, color), (left, text_y))
+            else:
+                process_text = self.fit_text(process, self.block_font, max_width)
+                self.screen.blit(self.block_font.render(process_text, True, color), (left, rect.y + 3))
+
+            if rect.height >= 38:
+                detail = self.fit_text(f"{segment} | {block.start}-{block.end} | {block.size}", self.small, max_width)
+                self.screen.blit(self.small.render(detail, True, color), (left, rect.y + 19))
+            return
+
+        text = self.fit_text(label, self.small, max_width)
+        self.screen.blit(self.small.render(text, True, color), (left, rect.y + 3))
+
+    def fit_text(self, text: str, font: pygame.font.Font, max_width: int) -> str:
+        if font.size(text)[0] <= max_width:
+            return text
+
+        suffix = "..."
+        available = max_width - font.size(suffix)[0]
+        if available <= 0:
+            return suffix
+
+        clipped = text
+        while clipped and font.size(clipped)[0] > available:
+            clipped = clipped[:-1]
+        return clipped.rstrip() + suffix
 
     def draw_tables(self) -> None:
         self.panel(pygame.Rect(754, 82, 470, 652))
@@ -389,8 +445,10 @@ class MemoryAllocationApp:
 
     def table_row(self, values: list[str], xs: list[int], y: int) -> None:
         pygame.draw.line(self.screen, (232, 235, 240), (xs[0], y + 24), (1190, y + 24), 1)
-        for value, x in zip(values, xs):
-            self.label(value, x, y, self.font, INK)
+        for index, (value, x) in enumerate(zip(values, xs)):
+            next_x = xs[index + 1] if index + 1 < len(xs) else 1190
+            text = self.fit_text(value, self.font, next_x - x - 12)
+            self.label(text, x, y, self.font, INK)
 
     def status_box(self, rect: pygame.Rect) -> None:
         pygame.draw.rect(self.screen, (250, 251, 253), rect, border_radius=5)

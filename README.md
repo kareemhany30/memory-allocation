@@ -6,11 +6,13 @@ Python/Pygame GUI for the operating systems memory allocation assignment.
 
 - Configure total memory size.
 - Add initial free partitions (holes) with starting address and size.
+- Start with an empty holes table so the user decides which memory ranges are free.
 - Add processes one by one with any number of named segments.
 - Allocate with First-Fit or Best-Fit.
 - Reject a process if any segment cannot fit, with rollback of already-tested segments.
 - Deallocate a whole process and merge released space with neighboring holes.
 - Show a live memory layout, free partitions table, and segment table.
+- Reset the whole simulator back to the default state with one button.
 
 ## Requirements
 
