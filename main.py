@@ -103,6 +103,8 @@ class MemoryAllocationApp:
 
         self.manager = MemoryManager(1024)
         self.pending_holes: list[Hole] = []
+        self.base_holes: list[Hole] = []
+        self.process_specs: list[tuple[str, list[tuple[str, int]]]] = []
         self.pending_segments: list[tuple[str, int]] = []
         self.method = "first_fit"
         self.status = "Enter holes, add process segments, then allocate."
@@ -153,9 +155,9 @@ class MemoryAllocationApp:
                 self.pending_holes.clear()
                 self.status_ok("Hole list cleared. Add the free partitions.")
             elif action == "first_fit":
-                self.method = "first_fit"
+                self.change_method("first_fit")
             elif action == "best_fit":
-                self.method = "best_fit"
+                self.change_method("best_fit")
             elif action == "add_segment":
                 self.add_segment()
             elif action == "clear_segments":
@@ -179,11 +181,15 @@ class MemoryAllocationApp:
     def reset_memory(self) -> None:
         total = self.parse_int("total", "Total memory size", minimum=1)
         self.manager.configure_memory(total, self.pending_holes)
+        self.base_holes = list(self.pending_holes)
+        self.process_specs.clear()
         self.status_ok("Memory configured. Existing allocations were cleared.")
 
     def reset_all(self) -> None:
         self.manager = MemoryManager(1024)
         self.pending_holes = []
+        self.base_holes = []
+        self.process_specs.clear()
         self.pending_segments.clear()
         self.method = "first_fit"
         self.inputs["total"].value = "1024"
@@ -208,7 +214,9 @@ class MemoryAllocationApp:
 
     def allocate(self) -> None:
         process = self.inputs["process"].value.strip()
-        placements = self.manager.allocate_process(process, self.pending_segments, self.method)
+        segments = list(self.pending_segments)
+        placements = self.manager.allocate_process(process, segments, self.method)
+        self.process_specs.append((process, segments))
         total = sum(item.size for item in placements)
         self.pending_segments.clear()
         self.inputs["process"].value = self.next_process_name()
@@ -216,7 +224,31 @@ class MemoryAllocationApp:
 
     def deallocate(self, process_name: str) -> None:
         self.manager.deallocate_process(process_name)
+        self.process_specs = [
+            (name, segments) for name, segments in self.process_specs if name != process_name
+        ]
         self.status_ok(f"Deallocated all segments of {process_name} and merged holes.")
+
+    def change_method(self, method: str) -> None:
+        if method == self.method:
+            return
+
+        previous_method = self.method
+        previous_manager = self.manager
+        self.method = method
+
+        try:
+            rebuilt = MemoryManager(previous_manager.total_size)
+            rebuilt.configure_memory(previous_manager.total_size, self.base_holes)
+            for process_name, segments in self.process_specs:
+                rebuilt.allocate_process(process_name, segments, method)
+        except (ValueError, AllocationError) as exc:
+            self.method = previous_method
+            self.manager = previous_manager
+            raise ValueError(f"Cannot rebuild with {self.method_label(method)}: {exc}") from exc
+
+        self.manager = rebuilt
+        self.status_ok(f"Rebuilt current layout using {self.method_label()}.")
 
     def parse_int(self, input_name: str, label: str, minimum: int) -> int:
         value = self.inputs[input_name].value.strip()
@@ -244,13 +276,13 @@ class MemoryAllocationApp:
             Button(pygame.Rect(24, 252, 142, 36), "Apply Memory", "reset_memory", BLUE),
             Button(pygame.Rect(178, 252, 142, 36), "Clear Holes", "clear_holes", RED),
             Button(
-                pygame.Rect(24, 382, 142, 38),
+                pygame.Rect(24, 392, 142, 38),
                 "First-Fit",
                 "first_fit",
                 BLUE if self.method == "first_fit" else (123, 132, 145),
             ),
             Button(
-                pygame.Rect(178, 382, 142, 38),
+                pygame.Rect(178, 392, 142, 38),
                 "Best-Fit",
                 "best_fit",
                 BLUE if self.method == "best_fit" else (123, 132, 145),
@@ -299,8 +331,8 @@ class MemoryAllocationApp:
         if len(self.pending_holes) > 2:
             self.label(f"+ {len(self.pending_holes) - 2} more", 24, hole_y, self.small, MUTED)
 
-        self.label("Allocation method", 24, 352, self.bold)
-        self.label("Process", 24, 436, self.bold)
+        self.label("Allocation method", 24, 364, self.bold)
+        self.label("Process", 24, 444, self.bold)
         self.inputs["process"].draw(self.screen, self.font)
         self.label("Segment builder", 24, 522, self.bold)
         self.inputs["segment"].draw(self.screen, self.font)
@@ -457,8 +489,9 @@ class MemoryAllocationApp:
             message = message[:51] + "..."
         self.label(message, rect.x + 8, rect.y + 3, self.small, self.status_color)
 
-    def method_label(self) -> str:
-        return "First-Fit" if self.method == "first_fit" else "Best-Fit"
+    def method_label(self, method: str | None = None) -> str:
+        method = method or self.method
+        return "First-Fit" if method == "first_fit" else "Best-Fit"
 
     def status_ok(self, message: str) -> None:
         self.status = message
