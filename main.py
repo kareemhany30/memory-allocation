@@ -1,7 +1,5 @@
 """Program entry point.
 
-The GUI code lives in gui.py. This file stays tiny so it is obvious where the
-program starts when someone opens the project.
 """
 
 from gui import MemoryAllocationApp
