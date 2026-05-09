@@ -1,3 +1,9 @@
+"""Core memory-allocation logic.
+
+This file has no Pygame code on purpose. Keeping the simulation separate from
+the GUI makes the algorithms easier to test and easier to explain in a report.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +11,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Hole:
+    """A free partition in memory."""
+
     start: int
     size: int
 
@@ -15,6 +23,8 @@ class Hole:
 
 @dataclass(frozen=True)
 class SegmentPlacement:
+    """The final location of one process segment after allocation."""
+
     process_name: str
     segment_name: str
     start: int
@@ -27,6 +37,8 @@ class SegmentPlacement:
 
 @dataclass(frozen=True)
 class MemoryBlock:
+    """A drawable memory range: free hole, allocated segment, or reserved space."""
+
     start: int
     size: int
     label: str
@@ -42,12 +54,16 @@ class AllocationError(ValueError):
 
 
 class MemoryManager:
+    """Keeps the current memory state and applies allocation/deallocation rules."""
+
     def __init__(self, total_size: int = 1024) -> None:
         self.total_size = total_size
         self.holes: list[Hole] = []
         self.allocations: dict[str, list[SegmentPlacement]] = {}
 
     def configure_memory(self, total_size: int, holes: list[Hole]) -> None:
+        """Start a fresh simulation with the holes entered by the user."""
+
         if total_size <= 0:
             raise ValueError("Total memory size must be positive.")
 
@@ -62,6 +78,8 @@ class MemoryManager:
         segments: list[tuple[str, int]],
         method: str,
     ) -> list[SegmentPlacement]:
+        """Allocate every segment of a process, or fail without changing memory."""
+
         process_name = process_name.strip()
         if not process_name:
             raise ValueError("Process name is required.")
@@ -83,6 +101,7 @@ class MemoryManager:
         if method not in {"first_fit", "best_fit"}:
             raise ValueError("Allocation method must be First-Fit or Best-Fit.")
 
+        # Work on a copy first. If any segment fails, the real state stays untouched.
         temp_holes = list(self.holes)
         placements: list[SegmentPlacement] = []
 
@@ -109,11 +128,14 @@ class MemoryManager:
             else:
                 temp_holes[hole_index] = Hole(hole.start + size, remaining)
 
+        # Only commit the new state after the full process fits.
         self.holes = self._merge_holes(temp_holes)
         self.allocations[process_name] = placements
         return placements
 
     def deallocate_process(self, process_name: str) -> list[SegmentPlacement]:
+        """Release all segments of one process and merge the new holes."""
+
         if process_name not in self.allocations:
             raise ValueError(f"{process_name} is not allocated.")
 
@@ -123,6 +145,8 @@ class MemoryManager:
         return placements
 
     def all_segments(self) -> list[SegmentPlacement]:
+        """Return all allocated segments ordered by memory address."""
+
         segments: list[SegmentPlacement] = []
         for process_segments in self.allocations.values():
             segments.extend(process_segments)
@@ -132,6 +156,8 @@ class MemoryManager:
         return sorted(self.allocations)
 
     def snapshot(self) -> list[MemoryBlock]:
+        """Build the full memory drawing, including reserved gaps."""
+
         blocks: list[MemoryBlock] = []
 
         for hole in self.holes:
@@ -151,6 +177,7 @@ class MemoryManager:
         completed: list[MemoryBlock] = []
         cursor = 0
         for block in blocks:
+            # Anything that is not a free hole or segment is shown as reserved.
             if block.start > cursor:
                 completed.append(
                     MemoryBlock(cursor, block.start - cursor, "Reserved", "reserved")
@@ -164,6 +191,8 @@ class MemoryManager:
         return completed
 
     def _select_hole(self, holes: list[Hole], size: int, method: str) -> int | None:
+        """Choose a hole using the selected strategy."""
+
         candidates = [(index, hole) for index, hole in enumerate(holes) if hole.size >= size]
         if not candidates:
             return None
@@ -174,6 +203,8 @@ class MemoryManager:
         return min(candidates, key=lambda item: item[1].size)[0]
 
     def _validate_holes(self, total_size: int, holes: list[Hole]) -> list[Hole]:
+        """Validate user-entered holes before applying them to the simulation."""
+
         if not holes:
             return []
 
@@ -193,6 +224,8 @@ class MemoryManager:
         return self._merge_holes(ordered)
 
     def _merge_holes(self, holes: list[Hole]) -> list[Hole]:
+        """Combine holes that touch or overlap after deallocation."""
+
         ordered = sorted(holes, key=lambda item: item.start)
         merged: list[Hole] = []
 

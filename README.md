@@ -19,17 +19,28 @@ Python/Pygame GUI for the operating systems memory allocation assignment.
 
 Use Python 3.10 to 3.13. Pygame may not have a Windows wheel yet for Python 3.14.
 
+## Project Structure
+
+```text
+memory_allocation_pygame/
+|-- main.py              # Small entry point that starts the program
+|-- gui.py               # Pygame GUI, buttons, input handling, drawing, and app loop
+|-- memory_allocator.py  # First-Fit/Best-Fit logic, deallocation, holes, and segment tables
+|-- requirements.txt     # Python packages needed to run the project
+|-- pyproject.toml       # Project metadata and supported Python version
+|-- .gitignore           # Files/folders Git should not upload, like caches and builds
+`-- README.md            # Project explanation, run steps, and GitHub upload notes
+```
+
+`main.py` is the file you run to start the program. It opens the app from
+`gui.py`. The GUI uses the logic from `memory_allocator.py`, so the interface
+and the allocation algorithms stay separate and easy to understand.
+
 ## Run
 
 ```bash
 py -3.13 -m pip install -r requirements.txt
 py -3.13 main.py
-```
-
-## Test
-
-```bash
-py -3.13 tests.py
 ```
 
 ## GitHub Upload
