@@ -12,6 +12,7 @@ Python/Pygame GUI for the operating systems memory allocation assignment.
 - Switch between First-Fit and Best-Fit after allocating to rebuild the current layout.
 - Reject a process if any segment cannot fit, with rollback of already-tested segments.
 - Deallocate a whole process and merge released space with neighboring holes.
+- Deallocate existing processes from the bottom-right controls.
 - Show a live memory layout, free partitions table, and segment table.
 - Reset the whole simulator back to the default state with one button.
 

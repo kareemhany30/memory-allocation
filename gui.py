@@ -60,7 +60,11 @@ class Button:
 
         fill = self.fill if self.enabled else (178, 184, 194)
         pygame.draw.rect(surface, fill, self.rect, border_radius=6)
-        label = font.render(self.text, True, (255, 255, 255))
+
+        text = self.text
+        while font.size(text)[0] > self.rect.width - 18 and len(text) > 4:
+            text = text[:-4].rstrip() + "..."
+        label = font.render(text, True, (255, 255, 255))
         surface.blit(label, label.get_rect(center=self.rect.center))
 
     def hit(self, pos: tuple[int, int]) -> bool:
@@ -351,6 +355,21 @@ class MemoryAllocationApp:
                 break
             buttons.append(Button(pygame.Rect(24, y, 296, 34), f"Deallocate {process}", f"free:{process}", VIOLET))
             y += 40
+
+        right_x = 772
+        right_y = 644
+        button_width = 198
+        gap = 14
+        for index, process in enumerate(self.manager.process_names()[:4]):
+            column = index % 2
+            row = index // 2
+            rect = pygame.Rect(
+                right_x + column * (button_width + gap),
+                right_y + row * 40,
+                button_width,
+                34,
+            )
+            buttons.append(Button(rect, f"Deallocate {process}", f"free:{process}", VIOLET))
         return buttons
 
     def draw(self) -> None:
@@ -500,7 +519,7 @@ class MemoryAllocationApp:
         rows = self.manager.all_segments()
         if not rows:
             self.label("Allocate a process to show its segment table.", 772, y + 8, self.font, MUTED)
-        for segment in rows[:9]:
+        for segment in rows[:4]:
             self.table_row(
                 [
                     segment.process_name,
@@ -512,6 +531,29 @@ class MemoryAllocationApp:
                 y,
             )
             y += 28
+        if len(rows) > 4:
+            self.label(f"+ {len(rows) - 4} more segments", 772, y + 2, self.small, MUTED)
+
+        self.draw_deallocation_area()
+
+    def draw_deallocation_area(self) -> None:
+        """Draw bottom-right controls for freeing existing processes."""
+
+        section_y = 596
+        self.label("Deallocate process", 772, section_y, self.bold)
+        pygame.draw.line(self.screen, LINE, (772, section_y + 28), (1190, section_y + 28), 1)
+
+        process_names = self.manager.process_names()
+        if not process_names:
+            self.label("No allocated process to deallocate.", 772, section_y + 46, self.font, MUTED)
+            return
+
+        for button in self.buttons():
+            if button.rect.x >= 754:
+                button.draw(self.screen, self.font)
+
+        if len(process_names) > 4:
+            self.label(f"+ {len(process_names) - 4} more on the left", 772, 724, self.small, MUTED)
 
     def block_color(self, block) -> tuple[int, int, int]:
         """Choose a color for each memory block type."""
