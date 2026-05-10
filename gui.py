@@ -258,7 +258,12 @@ class MemoryAllocationApp:
 
         process = self.inputs["process"].value.strip()
         segments = list(self.pending_segments)
-        placements = self.manager.allocate_process(process, segments, self.method)
+        try:
+            placements = self.manager.allocate_process(process, segments, self.method)
+        except AllocationError:
+            self.pending_segments.clear()
+            raise
+
         self.process_specs.append((process, segments))
         total = sum(item.size for item in placements)
         self.pending_segments.clear()
